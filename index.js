@@ -1,6 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const dotenv = require('dotenv');
+const express = require('express');
 dotenv.config();
 
 process.env.TZ = 'Asia/Jakarta';
@@ -24,6 +25,7 @@ const sendMessage = async (target, message) => {
         Authorization: process.env.FONNTE_KEY,
       },
     });
+    console.log('Message sent:', message);
     return response.json();
   } catch (error) {
     throw new Error(error.message);
@@ -93,3 +95,14 @@ const startScraping = () => {
 };
 
 startScraping();
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('Server is running. Scraping process is ongoing.');
+});
+
+app.listen(port, () => {
+  console.log(`Server is listening on port ${port}`);
+});
