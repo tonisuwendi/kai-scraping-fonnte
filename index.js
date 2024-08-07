@@ -1,17 +1,18 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const dotenv = require('dotenv');
-const express = require('express');
+
 dotenv.config();
 
 process.env.TZ = 'Asia/Jakarta';
 
 const dates = process.env.DATE_DEPARTURE.split(',');
-const interval = parseInt(process.env.INTERVAL_IN_MILLISECONDS, 10);
+const intervalDuration = parseInt(process.env.INTERVAL_IN_MILLISECONDS, 10);
 const from = process.env.FROM;
 const to = process.env.TO;
 
 let currentIndex = 0;
+let scrapeInterval;
 
 const sendMessage = async (target, message) => {
   try {
@@ -43,6 +44,8 @@ const scrapeHandler = async (date) => {
     });
     const html = response.data;
     const $ = cheerio.load(html);
+    let messageSent = false;
+
     $('.cruise-list .box').each((i, el) => {
       const namaKereta = $(el).find('span').first().text().trim();
       const jamKeberangkatan = $(el).attr('data-jamberangkat');
@@ -53,18 +56,8 @@ const scrapeHandler = async (date) => {
       const harga = $(el).attr('data-harga');
       const kursiTersedia = $(el).find('.submit_berangkat').length > 0;
 
-      if (namaKereta === process.env.TRAIN_NAME) {
-        console.log(`Tanggal: ${date}`);
-        console.log(`Nama Kereta: ${namaKereta}`);
-        console.log(`Jam Keberangkatan: ${jamKeberangkatan}`);
-        console.log(`Jam Tiba: ${jamTiba}`);
-        console.log(`Dari: ${dari}`);
-        console.log(`Ke: ${ke}`);
-        console.log(`Kelas: ${kelas}`);
-        console.log(`Harga: Rp ${harga}`);
-        
-        if (kursiTersedia) {
-          sendMessage(process.env.FONNTE_TARGET, `
+      if (namaKereta === process.env.TRAIN_NAME && kursiTersedia) {
+        sendMessage(process.env.FONNTE_TARGET, `
 Ketersediaan: Kursi Tersedia
 Tanggal: ${date}
 Nama Kereta: ${namaKereta}
@@ -74,9 +67,14 @@ Dari: ${dari}
 Ke: ${ke}
 Kelas: ${kelas}
 Harga: Rp ${harga}`);
-        }
+        messageSent = true;
+        return false;
       }
     });
+
+    if (messageSent) {
+      clearInterval(scrapeInterval);
+    }
   } catch (error) {
     console.error(`Error for date ${date}:`, error);
   }
@@ -91,18 +89,8 @@ const startScraping = () => {
   scrapeHandler(currentDate);
 
   currentIndex += 1;
-  setTimeout(startScraping, interval);
 };
 
+scrapeInterval = setInterval(startScraping, intervalDuration);
+
 startScraping();
-
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send('Server is running. Scraping process is ongoing.');
-});
-
-app.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
-});
